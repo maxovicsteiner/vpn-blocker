@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <p id="ip">Loading...</p>
+    <script type="text/javascript">
+        var p = document.getElementById("ip");
+
+        async function getBlacklist() {
+            try {
+                var response = await fetch("http://localhost:5000/blacklist", {method: "GET"});
+                var data = await response.json();
+                return data || [];
+            } catch(err) {
+                p.innerText = "Error occured: Please try again";
+            };
+        };
+
+        async function addToBlacklist(ip) {
+            try {
+                await fetch("http://localhost:5000/blacklist", {method: "POST", headers: {
+                    'Content-Type': "application/json"
+                }, body: JSON.stringify({ip})});
+            } catch (error) {
+                console.log(error);
+                p.innerText = "Error occured: Please try again";
+            };
+
+        };
+
+        async function getIpAddressAndCheckForVPN() {
+            try {
+                var blacklist = await getBlacklist();
+                console.log(blacklist)
+                blacklist = JSON.parse(blacklist);
+                var {ip} = await (await fetch("https://api.ipify.org?format=json")).json();
+                for (var i = 0; i < blacklist.length; i++) 
+                {
+                    if (blacklist[i].toString() === ip.toString()) 
+                    {
+                        p.innerText = "Access denied: IP address is blacklisted";
+                        return;
+                    };
+                };
+
+                var {timezone} = await (await fetch(`https://api.ipgeolocation.io/timezone?apiKey=9e87994d3a6641a9bdc515bfe72a96a4&ip=${ip}`))
+                                    .json();
+
+                if (timezone === Intl.DateTimeFormat().resolvedOptions().timeZone) {
+                    p.innerText = "Access granted: No VPN is used";
+                } else {
+                    p.innerText = "Access denied: VPN is used";
+                    await addToBlacklist(ip);
+                }
+            } catch(err) {
+                p.innerText = "Error occured: Please try again";
+                console.log(err);
+            };
+        };
+
+        window.addEventListener("load", async function() {
+            await getIpAddressAndCheckForVPN();
+        });
+
+        </script>
+</body>
+</html>
